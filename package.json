@@ -16,6 +16,7 @@
     "@langchain/ollama": "^1.2.2",
     "@langchain/openai": "^1.2.4",
     "dotenv": "^16.4.5",
+    "glob": "^13.0.0",
     "inquirer": "^13.2.2",
     "langchain": "^1.2.16",
     "zod": "^4.3.6"

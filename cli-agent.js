@@ -11,6 +11,7 @@ import fs from "fs/promises"; // 비동기 파일 시스템
 import path from "path";
 import 'dotenv/config';
 import { spawn } from "child_process"; // 셸 명령어 실행용
+import { glob } from 'glob';
 
 // =========================================================
 // [1] 보안 유틸리티: 샌드박스 (Sandboxing)
@@ -190,7 +191,7 @@ async function startCLI() {
     agent,
     tools: tools,
     // verbose: true, // 이 주석을 풀면 AI의 생각 과정(로그)을 다 볼 수 있습니다.
-    maxIterations: 5, // Python의 max_iterations=10
+    maxIterations: 10, // 연쇄 실행 제한걸기
     // Node.js에서는 시간 제한을 AbortSignal로 관리하거나 별도 로직으로 처리합니다.
     handleParsingErrors: true, // Python의 handle_parsing_errors=True
     max_execution_time : 10 //실행 루프에 소요될 수 있는 최대 시간
@@ -243,6 +244,7 @@ async function startCLI() {
     } else if (userInput.toLowerCase() === "/chat") {
       console.log(`
       ✅ 사용 가능한 명령어:
+      /attach - 파일을 검색하고 첨부하여 질문합니다.
       /save  - 현재까지의 대화 내용을 파일로 저장합니다.
       /list  - 현재까지의 대화 내용을 콘솔에 출력합니다.
       /clear - 현재까지의 대화 내용을 모두 지웁니다.
@@ -298,6 +300,93 @@ async function startCLI() {
       }
       console.log("\n--- 기록 끝 ---\n");
       continue;
+    } else if (userInput.toLowerCase() === "/attach") {
+      const { searchTerm } = await inquirer.prompt([
+        {
+          type: "input",
+          name: "searchTerm",
+          message: "첨부할 파일 검색어 입력:",
+        },
+      ]);
+
+      if (!searchTerm) {
+        console.log("검색어가 입력되지 않았습니다. 메인 메뉴로 돌아갑니다.");
+        continue;
+      }
+
+      const foundFiles = await glob(`**/*${searchTerm}*`, { nodir: true, ignore: 'node_modules/**' });
+
+      if (foundFiles.length === 0) {
+        console.log(`'${searchTerm}'에 해당하는 파일을 찾을 수 없습니다.`);
+        continue;
+      }
+      foundFiles.forEach((file, idx ) => console.log(`${idx}.  ${file}`));
+
+      const { selectedFile } = await inquirer.prompt([
+        {
+          type: "list",
+          name: "selectedFile",
+          message: "첨부할 파일을 선택하세요:",
+          choices: [...foundFiles, new inquirer.Separator(), "취소"],
+        },
+      ]);
+
+      if (selectedFile === "취소") {
+        console.log("파일 첨부를 취소했습니다.");
+        continue;
+      }
+
+      try {
+        const fileContent = await fs.readFile(selectedFile, "utf-8");
+        
+        const { question } = await inquirer.prompt([
+          {
+            type: "input",
+            name: "question",
+            message: `'${selectedFile}' 파일에 대해 질문하세요:`,
+          },
+        ]);
+
+        if (!question) {
+          console.log("질문이 입력되지 않았습니다. 메인 메뉴로 돌아갑니다.");
+          continue;
+        }
+
+        const combinedInput = `다음 파일 내용을 참고하여 질문에 답해주세요:\n\n[파일: ${selectedFile}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n[질문]\n${question}`;
+        
+        // This part is duplicated from the main execution logic below
+        // It's necessary to invoke the agent here with the combined context
+        const controller = new AbortController();
+        const sigintHandler = () => {
+          console.log("\n[명령어 실행 취소]");
+          controller.abort();
+        };
+
+        try {
+          process.once('SIGINT', sigintHandler);
+          const history = await memory.loadMemoryVariables({});
+          const result = await executor.invoke(
+            {
+              input: combinedInput,
+              chat_history: history.chat_history,
+            },
+            { signal: controller.signal }
+          );
+          // Save the combined input and its result to memory
+          await memory.saveContext({ input: combinedInput }, { output: result.output });
+          console.log(`\n🤖: ${result.output}\n`);
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error("❌ 오류 발생:", error.message);
+          }
+        } finally {
+          process.removeListener('SIGINT', sigintHandler);
+        }
+
+      } catch (error) {
+        console.error(`❌ '${selectedFile}' 파일 읽기 오류:`, error.message);
+      }
+      continue; // Go back to the main loop after processing
     }
 
     const controller = new AbortController();
