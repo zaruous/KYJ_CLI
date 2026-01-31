@@ -7,11 +7,13 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod"; // 파라미터 검증용
 import inquirer from "inquirer"; // 사용자 입력용
+import search from "./search/search/dist/index.js";
 import fs from "fs/promises"; // 비동기 파일 시스템
 import path from "path";
 import 'dotenv/config';
 import { spawn } from "child_process"; // 셸 명령어 실행용
 import { glob } from 'glob';
+import chalk from 'chalk';
 
 // =========================================================
 // [1] 보안 유틸리티: 샌드박스 (Sandboxing)
@@ -96,7 +98,7 @@ const tools = [
         return `에러: 보안상의 이유로 '${commandBase}' 명령어는 실행할 수 없습니다.`;
       }
 
-      console.log(`[툴 실행] 셸 명령어 실행: ${command}`);
+      console.log(chalk.gray(`[툴 실행] 셸 명령어 실행: ${command}`));
 
       return new Promise((resolve) => {
         const child = spawn(command, {
@@ -158,8 +160,8 @@ function getModel(provider) {
 }
 
 async function startCLI() {
-  console.log("🛠️  AI 개발자 CLI 에이전트 시작 (종료하려면 '/exit' 입력)");
-  
+  console.log(chalk.blue("🛠️  AI 개발자 CLI 에이전트 시작 (종료하려면 '/exit' 입력)"));
+
   // 1. 모델 선택 (예시를 위해 하드코딩 혹은 inquirer로 선택 가능)
   // 셋 중 하나를 선택하세요: 'gemini', 'openai', 'llama'
   const model = getModel('gemini');
@@ -208,7 +210,7 @@ async function startCLI() {
         {
           type: "input",
           name: "userInput",
-          message: "KYJ_AI >",
+          message: chalk.green.bold("KYJ_AI >"),
         },
       ]);
       userInput = answer.userInput;
@@ -223,7 +225,7 @@ async function startCLI() {
           },
         ]);
         if (confirmExit) {
-          console.log("프로그램을 종료합니다. 안녕히 계세요!");
+          console.log(chalk.yellow("프로그램을 종료합니다. 안녕히 계세요!"));
           process.exit(0);
         } else {
           continue; // Exit confirmed, so continue to the next loop iteration.
@@ -233,13 +235,13 @@ async function startCLI() {
     }
     
     if (userInput.toLowerCase() === "/exit") {
-      console.log("종료합니다.");
+      console.log(chalk.yellow("종료합니다."));
       process.exit(0);
     } 
     //채팅 히스토리를 비움.
     else if (userInput.toLowerCase() === "/clear") {
       await memory.clear(); // 채팅 기록을 지웁니다.
-      console.log("✅ 채팅 기록이 지워졌습니다."); // 확인 메시지
+      console.log(chalk.yellow("✅ 채팅 기록이 지워졌습니다.")); // 확인 메시지
       continue; // 에이전트 실행을 건너뛰고 새 입력을 기다립니다.
     } else if (userInput.toLowerCase() === "/chat") {
       console.log(`
@@ -258,7 +260,7 @@ async function startCLI() {
       const messages = historyData.chat_history || [];
 
       if (messages.length === 0) {
-        console.log("✅ 채팅 기록이 없습니다.");
+        console.log(chalk.yellow("✅ 채팅 기록이 없습니다."));
         continue;
       }
 
@@ -275,9 +277,9 @@ async function startCLI() {
       try {
         const safePath = getSafePath(fileName);
         await fs.writeFile(safePath, formattedHistory, "utf-8");
-        console.log(`✅ 채팅 기록이 '${fileName}' 파일로 저장되었습니다.`);
+        console.log(chalk.yellow(`✅ 채팅 기록이 '${fileName}' 파일로 저장되었습니다.`));
       } catch (error) {
-        console.error("❌ 파일 저장 중 오류가 발생했습니다:", error.message);
+        console.error(chalk.red("❌ 파일 저장 중 오류가 발생했습니다:"), error.message);
       }
       continue;
     } else if (userInput.toLowerCase() === "/list") {
@@ -285,54 +287,28 @@ async function startCLI() {
       const messages = historyData.chat_history || [];
 
       if (messages.length === 0) {
-        console.log("✅ 채팅 기록이 없습니다.");
+        console.log(chalk.yellow("✅ 채팅 기록이 없습니다."));
         continue;
       }
 
-      console.log("\n--- 📝 채팅 기록 ---");
+      console.log(chalk.bold("\n--- 📝 채팅 기록 ---"));
       for (const message of messages) {
         if (message._getType() === "human") {
           console.log(`\n🧑 Human:\n${message.content}`);
         } else if (message._getType() === "ai") {
           const aiContent = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2);
-          console.log(`\n🤖 AI:\n${aiContent}`);
+          console.log(`\n${chalk.blue.bold('🤖 AI:')}\n${aiContent}`);
         }
       }
-      console.log("\n--- 기록 끝 ---\n");
+      console.log(chalk.bold("\n--- 기록 끝 ---\n"));
       continue;
-    } else if (userInput.toLowerCase() === "/attach") {
-      const { searchTerm } = await inquirer.prompt([
-        {
-          type: "input",
-          name: "searchTerm",
-          message: "첨부할 파일 검색어 입력:",
-        },
-      ]);
-
-      if (!searchTerm) {
-        console.log("검색어가 입력되지 않았습니다. 메인 메뉴로 돌아갑니다.");
-        continue;
-      }
-
-      const foundFiles = await glob(`**/*${searchTerm}*`, { nodir: true, ignore: 'node_modules/**' });
-
-      if (foundFiles.length === 0) {
-        console.log(`'${searchTerm}'에 해당하는 파일을 찾을 수 없습니다.`);
-        continue;
-      }
-      foundFiles.forEach((file, idx ) => console.log(`${idx}.  ${file}`));
-
-      const { selectedFile } = await inquirer.prompt([
-        {
-          type: "list",
-          name: "selectedFile",
-          message: "첨부할 파일을 선택하세요:",
-          choices: [...foundFiles, new inquirer.Separator(), "취소"],
-        },
-      ]);
-
-      if (selectedFile === "취소") {
-        console.log("파일 첨부를 취소했습니다.");
+    }
+    else if (userInput.startsWith('@')) {
+      const initialSearch = userInput.substring(1).trim();
+      const selectedFile = await selectFile(initialSearch);
+      if(!selectedFile)
+      {
+        console.log(chalk.yellow("파일이 선택되지 않았습니다. 메인 메뉴로 돌아갑니다."));
         continue;
       }
 
@@ -343,12 +319,12 @@ async function startCLI() {
           {
             type: "input",
             name: "question",
-            message: `'${selectedFile}' 파일에 대해 질문하세요:`,
+            message: chalk.cyan(`'${selectedFile}' 파일에 대해 질문하세요:`),
           },
         ]);
 
         if (!question) {
-          console.log("질문이 입력되지 않았습니다. 메인 메뉴로 돌아갑니다.");
+          console.log(chalk.yellow("질문이 입력되지 않았습니다. 메인 메뉴로 돌아갑니다."));
           continue;
         }
 
@@ -358,7 +334,7 @@ async function startCLI() {
         // It's necessary to invoke the agent here with the combined context
         const controller = new AbortController();
         const sigintHandler = () => {
-          console.log("\n[명령어 실행 취소]");
+          console.log(chalk.yellow("\n[명령어 실행 취소]"));
           controller.abort();
         };
 
@@ -374,24 +350,24 @@ async function startCLI() {
           );
           // Save the combined input and its result to memory
           await memory.saveContext({ input: combinedInput }, { output: result.output });
-          console.log(`\n🤖: ${result.output}\n`);
+          console.log(`\n${chalk.blue.bold('🤖:')} ${result.output}\n`);
         } catch (error) {
           if (error.name !== 'AbortError') {
-            console.error("❌ 오류 발생:", error.message);
+            console.error(chalk.red("❌ 오류 발생:"), error.message);
           }
         } finally {
           process.removeListener('SIGINT', sigintHandler);
         }
 
       } catch (error) {
-        console.error(`❌ '${selectedFile}' 파일 읽기 오류:`, error.message);
+        console.error(chalk.red(`❌ '${selectedFile}' 파일 읽기 오류:`), error.message);
       }
       continue; // Go back to the main loop after processing
     }
 
     const controller = new AbortController();
     const sigintHandler = () => {
-      console.log("\n[명령어 실행 취소]");
+      console.log(chalk.yellow("\n[명령어 실행 취소]"));
       controller.abort();
     };
 
@@ -408,15 +384,39 @@ async function startCLI() {
       );
       await memory.saveContext({ input: userInput }, { output: result.output });
 
-      console.log(`\n🤖: ${result.output}\n`);
+      console.log(`\n${chalk.blue.bold('🤖:')} ${result.output}\n`);
     } catch (error) {
       if (error.name !== 'AbortError') {
-        console.error("❌ 오류 발생:", error.message);
+        console.error(chalk.red("❌ 오류 발생:"), error.message);
       }
     } finally {
       process.removeListener('SIGINT', sigintHandler);
     }
   }
+}
+
+async function selectFile(initialInput = '') {
+  const allFiles = await glob('**/*', { ignore: ['node_modules/**', '.git/**', '*.env'] });
+
+  const initialFiles = initialInput
+    ? allFiles.filter(f => f.toLowerCase().includes(initialInput.toLowerCase()))
+    : allFiles;
+
+  return await search({
+    message: '첨부할 파일을 선택하세요:',
+    source: async (input) => {
+      // When the prompt starts, `input` is `undefined`. We should show our pre-filtered list.
+      if (input === undefined) {
+        return initialFiles;
+      }
+      
+      // When user starts typing, `input` has a value. We should filter the *entire* file list.
+      if (!input) {
+        return allFiles;
+      }
+      return allFiles.filter(f => f.toLowerCase().includes(input.toLowerCase()));
+    },
+  });
 }
 
 startCLI();
