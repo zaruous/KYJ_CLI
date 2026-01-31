@@ -161,7 +161,7 @@ async function startCLI() {
   
   // 1. 모델 선택 (예시를 위해 하드코딩 혹은 inquirer로 선택 가능)
   // 셋 중 하나를 선택하세요: 'gemini', 'openai', 'llama'
-  //const model = getModel('gemini');
+  const model = getModel('gemini');
   //const model = getModel('openai'); 
   //const model = getModel('gemini'); 
 
