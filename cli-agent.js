@@ -160,7 +160,16 @@ function getModel(provider) {
 }
 
 async function startCLI() {
-  console.log(chalk.blue("🛠️  AI 개발자 CLI 에이전트 시작 (종료하려면 '/exit' 입력)"));
+  console.log(chalk.blue.bold(`
+ _  __ __   __     _   ____ _     ___ 
+| |/ / \\ \\ / /    | | / ___| |   |_ _|
+| ' /   \\ V /  _  | || |   | |    | | 
+| . \\    | |  | |_| || |___| |___ | | 
+|_|\\_\\   |_|   \\___/  \\____|_____|___|
+`));
+
+// 여기에 CLI 시작 로직이 이어집니다...
+  console.log(chalk.green("KYJ CLI에 오신 것을 환영합니다! 'help'를 입력해 명령어를 확인하세요."));
 
   // 1. 모델 선택 (예시를 위해 하드코딩 혹은 inquirer로 선택 가능)
   // 셋 중 하나를 선택하세요: 'gemini', 'openai', 'llama'
@@ -243,6 +252,17 @@ async function startCLI() {
       await memory.clear(); // 채팅 기록을 지웁니다.
       console.log(chalk.yellow("✅ 채팅 기록이 지워졌습니다.")); // 확인 메시지
       continue; // 에이전트 실행을 건너뛰고 새 입력을 기다립니다.
+    } else if (userInput.toLowerCase() === "/help") {
+      console.log(`
+      📜 사용 가능한 명령어:
+      /help   - 모든 명령어에 대한 자세한 설명을 출력합니다.
+      /attach - 특정 파일의 내용을 참조하여 AI에게 질문합니다. (예: @<파일경로> 후 질문 입력)
+      /save   - 현재까지의 대화 내용을 Markdown 파일로 저장합니다.
+      /list   - 현재까지의 대화 내용을 콘솔에 출력합니다.
+      /clear  - 현재까지의 모든 대화 기록을 지웁니다.
+      /exit   - CLI 에이전트를 종료합니다.
+      `);
+      continue;
     } else if (userInput.toLowerCase() === "/chat") {
       console.log(`
       ✅ 사용 가능한 명령어:
