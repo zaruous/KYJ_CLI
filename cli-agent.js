@@ -161,7 +161,7 @@ async function startCLI() {
   
   // 1. 모델 선택 (예시를 위해 하드코딩 혹은 inquirer로 선택 가능)
   // 셋 중 하나를 선택하세요: 'gemini', 'openai', 'llama'
-  const model = getModel('gemini'); 
+  //const model = getModel('gemini');
   //const model = getModel('openai'); 
   //const model = getModel('gemini'); 
 
@@ -190,7 +190,7 @@ async function startCLI() {
     agent,
     tools: tools,
     // verbose: true, // 이 주석을 풀면 AI의 생각 과정(로그)을 다 볼 수 있습니다.
-    maxIterations: 10, // Python의 max_iterations=10
+    maxIterations: 5, // Python의 max_iterations=10
     // Node.js에서는 시간 제한을 AbortSignal로 관리하거나 별도 로직으로 처리합니다.
     handleParsingErrors: true, // Python의 handle_parsing_errors=True
     max_execution_time : 10 //실행 루프에 소요될 수 있는 최대 시간
