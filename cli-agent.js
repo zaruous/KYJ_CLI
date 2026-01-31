@@ -1,5 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOllama } from "@langchain/ollama";
 import { AgentExecutor, createStructuredChatAgent } from "@langchain/classic/agents";
 import { BufferMemory } from "@langchain/classic/memory";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
@@ -140,6 +141,12 @@ function getModel(provider) {
       apiKey: process.env.GOOGLE_API_KEY,
       temperature: 0, // 0에 가까울수록 사실적이고 명령 수행에 적합
     });
+  } else if (provider === 'llama') {
+    return new ChatOllama({
+      baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+      model: process.env.OLLAMA_MODEL || "gemma3:1b",
+      temperature: 0,
+    });
   } else {
     return new ChatOpenAI({
       modelName: "gpt-4o", // gpt-4가 복잡한 파일 작업에 훨씬 유리합니다.
@@ -153,8 +160,10 @@ async function startCLI() {
   console.log("🛠️  AI 개발자 CLI 에이전트 시작 (종료하려면 '/exit' 입력)");
   
   // 1. 모델 선택 (예시를 위해 하드코딩 혹은 inquirer로 선택 가능)
+  // 셋 중 하나를 선택하세요: 'gemini', 'openai', 'llama'
   const model = getModel('gemini'); 
   //const model = getModel('openai'); 
+  //const model = getModel('gemini'); 
 
   // 2. 메모리 초기화 (이전 대화를 기억하는 저장소)
   // returnMessages: true는 채팅 메시지 객체 형태로 기억을 저장한다는 뜻입니다.
@@ -181,6 +190,10 @@ async function startCLI() {
     agent,
     tools: tools,
     // verbose: true, // 이 주석을 풀면 AI의 생각 과정(로그)을 다 볼 수 있습니다.
+    maxIterations: 10, // Python의 max_iterations=10
+    // Node.js에서는 시간 제한을 AbortSignal로 관리하거나 별도 로직으로 처리합니다.
+    handleParsingErrors: true, // Python의 handle_parsing_errors=True
+    max_execution_time : 10 //실행 루프에 소요될 수 있는 최대 시간
   });
 
 

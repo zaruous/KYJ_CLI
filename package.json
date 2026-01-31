@@ -13,8 +13,9 @@
     "@langchain/community": "^1.1.10",
     "@langchain/core": "^1.1.18",
     "@langchain/google-genai": "^2.1.14",
+    "@langchain/ollama": "^1.2.2",
     "@langchain/openai": "^1.2.4",
-    "dotenv": "^17.2.3",
+    "dotenv": "^16.4.5",
     "inquirer": "^13.2.2",
     "langchain": "^1.2.16",
     "zod": "^4.3.6"
