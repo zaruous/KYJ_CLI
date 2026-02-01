@@ -57,7 +57,11 @@ async function saveHistory(command) {
     if (commandHistory.length > 100) { // 최근 100개만 저장
         commandHistory.shift();
     }
-    await fs.appendFile(HISTORY_FILE, command + '\n', 'utf-8');
+    try {
+        await fs.appendFile(HISTORY_FILE, command + '\n', 'utf-8');
+    } catch (error) {
+        console.error(chalk.red('명령어 히스토리 저장 실패:'), error);
+    }
 }
 
 
@@ -114,13 +118,12 @@ const tools = [
       return new Promise((resolve) => {
         //const child = spawn(command, { shell: true, stdio: 'pipe' });
           const child = spawn(command, {
-              shell: 'powershell.exe',
-              encoding: 'utf-8'
+              shell: 'powershell.exe'
           });
         let stdout = '';
         let stderr = '';
-        child.stdout.on('data', (data) => { stdout += data.toString(); });
-        child.stderr.on('data', (data) => { stderr += data.toString(); });
+        child.stdout.on('data', (data) => { stdout += data.toString('utf-8'); });
+        child.stderr.on('data', (data) => { stderr += data.toString('utf-8'); });
         child.on('close', (code) => {
           let output = `종료 코드: ${code}\n`;
           if (stdout.trim()) {
@@ -148,7 +151,7 @@ const tools = [
 function getModel(provider) {
   if (provider === 'gemini') {
       //return new ChatGoogleGenerativeAI({ model: "gemini-3-flash-preview", apiKey: process.env.GOOGLE_API_KEY, temperature: 0 });
-      return new ChatGoogleGenerativeAI({ model: "gemini-flash-lite-latest", apiKey: process.env.GOOGLE_API_KEY, temperature: 0 });
+      return new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash", apiKey: process.env.GOOGLE_API_KEY, temperature: 0 });
   } else if (provider === 'llama') {
     return new ChatOllama({ baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434", model: process.env.OLLAMA_MODEL || "gemma2:9b", temperature: 0 });
   } else {
@@ -192,7 +195,7 @@ async function createAgentExecutor() {
     return new AgentExecutor({
         agent,
         tools: tools,
-        // verbose: true, // 이 주석을 풀면 AI의 생각 과정(로그)을 다 볼 수 있습니다.
+        verbose: false, // 이 주석을 풀면 AI의 생각 과정(로그)을 다 볼 수 있습니다.
         maxIterations: 10, // 연쇄 실행 제한걸기
         // Node.js에서는 시간 제한을 AbortSignal로 관리하거나 별도 로직으로 처리합니다.
         handleParsingErrors: true, // Python의 handle_parsing_errors=True
@@ -211,12 +214,12 @@ async function startCLI() {
 
   program.exitOverride();
 
-  console.log(chalk.blue.bold(`
+    console.log(chalk.blue.bold(`
  _  __ __   __     _   ____ _     ___ 
-| |/ / \ \ / /    | | / ___| |   |_ _|
-| ' /   \ V /  _  | || |   | |    | | 
-| . \    | |  | |_| || |___| |___ | | 
-|_|\_\   |_|   \___/  \____|_____|___|
+| |/ / \\ \\ / /    | | / ___| |   |_ _|
+| ' /   \\ V /  _  | || |   | |    | | 
+| . \\    | |  | |_| || |___| |___ | | 
+|_|\\_\\   |_|   \\___/  \\____|_____|___|
 `));
   console.log(chalk.green("KYJ CLI에 오신 것을 환영합니다! '/help'를 입력해 명령어를 확인하세요."));
 
@@ -255,7 +258,7 @@ async function startCLI() {
     .action(async () => {
         await memory.clear();
         console.log(chalk.yellow("✅ 채팅 기록이 지워졌습니다."));
-        await saveHistory('/clear');
+        //await saveHistory('/clear');
         askQuestion();
     });
 
@@ -282,7 +285,7 @@ async function startCLI() {
             try {
                 const safePath = getSafePath(fileName);
                 await fs.writeFile(safePath, formattedHistory, "utf-8");
-                console.log(chalk.yellow(`✅ 채팅 기록이 '${fileName}' 파일로 저장되었습니다.`));
+                console.log(chalk.yellow(`✅ 채팅 기록이 '${safePath}' 파일로 저장되었습니다.`));
             } catch (error) {
                 console.error(chalk.red("❌ 파일 저장 중 오류가 발생했습니다:"), error.message);
             }
@@ -322,19 +325,15 @@ async function startCLI() {
             console.log(chalk.yellow("프로그램을 종료합니다. 안녕히 계세요!"));
             process.exit(0);
         });
-    
-    program.on('command:*', async (operands) => {
-        const command = operands.join(' ');
-        if (command.startsWith('@')) {
-            await handleAttach(command);
-        } else {
-            await handleChat(command);
-        }
-    });
 
-    const handleAttach = async (userInput) => {
-        await saveHistory(userInput);
-        const initialSearch = userInput.substring(1).trim();
+    const handleAttach = async (rawInput) => {
+        await saveHistory(rawInput);
+        let initialSearch = "";
+        const firstWord = rawInput.split(' ')[0];
+        if (firstWord.length > 1) {
+            initialSearch = firstWord.substring(1).trim();
+        }
+
         const selectedFile = await selectFile(initialSearch);
         if (!selectedFile) {
             console.log(chalk.yellow("파일이 선택되지 않았습니다."));
@@ -390,7 +389,21 @@ async function startCLI() {
                askQuestion();
            }
         }
-      } else {
+      }
+      else if(firstArg.startsWith("@"))
+      {
+          await handleAttach(userInput);
+          /*program.on('command:*', async (operands) => {
+              const command = operands.join(' ');
+              if (command.startsWith('@')) {
+
+              } else {
+                  await handleChat(command);
+              }
+          });
+          */
+      }
+      else {
         await handleChat(userInput);
       }
 
