@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOllama } from "@langchain/ollama";
@@ -20,7 +21,7 @@ import os from 'os';
 // =========================================================
 // [1] 보안 및 유틸리티
 // =========================================================
-const BASE_DIR = process.cwd();
+let BASE_DIR = process.cwd();
 const HISTORY_FILE = path.join(os.homedir(), '.kyj_cli_history');
 
 function getSafePath(targetPath) {
@@ -118,7 +119,8 @@ const tools = [
       return new Promise((resolve) => {
         //const child = spawn(command, { shell: true, stdio: 'pipe' });
           const child = spawn(command, {
-              shell: 'powershell.exe'
+              shell: 'powershell.exe',
+              cwd: BASE_DIR
           });
         let stdout = '';
         let stderr = '';
@@ -263,6 +265,26 @@ async function startCLI() {
     });
 
   program
+    .command('/basedir <path>')
+    .description('작업 디렉터리(BASE_DIR)를 변경합니다.')
+    .action(async (newPath) => {
+        try {
+            const absolutePath = path.resolve(BASE_DIR, newPath);
+            const stats = await fs.stat(absolutePath);
+            if (stats.isDirectory()) {
+                BASE_DIR = absolutePath;
+                console.log(chalk.yellow(`✅ BASE_DIR이 변경되었습니다: ${BASE_DIR}`));
+            } else {
+                console.error(chalk.red("❌ 오류: 지정한 경로가 디렉터리가 아닙니다."));
+            }
+        } catch (error) {
+            console.error(chalk.red(`❌ 오류: 경로를 찾을 수 없거나 접근할 수 없습니다: ${error.message}`));
+        }
+        await saveHistory(`/basedir ${newPath}`);
+        askQuestion();
+    });
+
+  program
     .command('/save')
     .description('현재까지의 대화 내용을 Markdown 파일로 저장합니다.')
     .action(async () => {
@@ -342,10 +364,11 @@ async function startCLI() {
         }
 
         try {
-            let fileContent = await fs.readFile(selectedFile, "utf-8");
-            const MAX_FILE_SIZE = 100000; // 100KB
+            const safePath = getSafePath(selectedFile);
+            let fileContent = await fs.readFile(safePath, "utf-8");
+            const MAX_FILE_SIZE = 1000000; // 1MB
             if (fileContent.length > MAX_FILE_SIZE) {
-                console.log(chalk.yellow(`경고: 파일 크기가 ${MAX_FILE_SIZE / 1000}KB를 초과하여 앞부분만 사용합니다.`));
+                console.log(chalk.yellow(`경고: 파일 크기가 ${MAX_FILE_SIZE / 1000000}MB를 초과하여 앞부분만 사용합니다.`));
                 fileContent = fileContent.substring(0, MAX_FILE_SIZE) + "\n... (파일 내용이 너무 길어 뒷부분이 잘렸습니다)";
             }
             
@@ -431,7 +454,10 @@ async function startCLI() {
 }
 
 async function selectFile(initialInput = '') {
-  const allFiles = await glob('**/*', { ignore: ['node_modules/**', '.git/**', '*.env', '**/node_modules/**', '**/.git/**', '.m2/**', '.idea/**'] });
+  const allFiles = await glob('**/*', { 
+    cwd: BASE_DIR,
+    ignore: ['node_modules/**', '.git/**', '*.env', '**/node_modules/**', '**/.git/**', '.m2/**', '.idea/**'] 
+  });
   const initialFiles = initialInput ? allFiles.filter(f => f.toLowerCase().includes(initialInput.toLowerCase())) : allFiles;
 
   return await search({

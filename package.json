@@ -1,15 +1,29 @@
 {
-  "name": "simple-mcp-service",
+  "name": "mycli",
   "version": "1.0.0",
-  "description": "A simple MCP service using Node.js and Express",
-  "main": "server.js",
+  "description": "My cli service.",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.17.1"
+    "@langchain/classic": "^1.0.15",
+    "@langchain/core": "^1.1.19",
+    "@langchain/google-genai": "^2.1.15",
+    "@langchain/ollama": "^1.2.2",
+    "@langchain/openai": "^1.2.5",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "dotenv": "^17.2.4",
+    "express": "^4.17.1",
+    "glob": "^13.0.1",
+    "inquirer": "^13.2.2",
+    "zod": "^4.3.6"
+  },
+  "bin": {
+    "mycli": "./index.js"
   }
 }
